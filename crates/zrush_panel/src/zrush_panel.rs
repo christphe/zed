@@ -366,7 +366,7 @@ impl Panel for ZrushPanel {
     }
 
     fn icon(&self, _window: &Window, _cx: &App) -> Option<ui::IconName> {
-        None
+        Some(ui::IconName::Code)
     }
 
     fn icon_tooltip(&self, _window: &Window, _cx: &App) -> Option<&'static str> {
@@ -375,6 +375,10 @@ impl Panel for ZrushPanel {
 
     fn toggle_action(&self) -> Box<dyn Action> {
         Box::new(Toggle)
+    }
+
+    fn starts_open(&self, _window: &Window, _cx: &App) -> bool {
+        true
     }
 
     fn activation_priority(&self) -> u32 {
