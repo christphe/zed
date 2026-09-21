@@ -235,6 +235,7 @@ zed_env_vars.workspace = true
 zlog.workspace = true
 zlog_settings.workspace = true
 ztracing.workspace = true
+zrush_panel.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 etw_tracing.workspace = true
