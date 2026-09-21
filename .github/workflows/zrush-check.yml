@@ -1,0 +1,21 @@
+name: zrush check
+
+on:
+  push:
+    branches: [z-rush]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check zrush panel
+        run: cargo check -p zrush_panel
+      - name: Check Zed integration
+        run: cargo check -p zed
