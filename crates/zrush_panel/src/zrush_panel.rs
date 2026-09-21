@@ -43,7 +43,10 @@ pub fn init(cx: &mut App) {
         });
         workspace.register_action(|workspace, _: &Refresh, _window, cx| {
             if let Some(panel) = workspace.panel::<ZrushPanel>(cx) {
-                panel.update(cx, |panel, cx| panel.refresh(cx));
+                panel.update(cx, |panel, cx| {
+                    panel.refresh();
+                    cx.notify();
+                });
             }
         });
     })
@@ -65,18 +68,21 @@ impl ZrushPanel {
             })?
             .context("Zrush needs a local project root")?;
 
-        let service = Self::service_for(repo).map(Arc::new);
+        let (service, error) = match Self::service_for(repo) {
+            Ok(service) => (Some(Arc::new(service)), None),
+            Err(error) => (None, Some(error.to_string())),
+        };
 
         workspace.update_in(&mut cx, |_workspace, _window, cx| {
             let mut panel = Self {
                 focus_handle: cx.focus_handle(),
                 position: DockPosition::Right,
-                service: service.ok(),
+                service,
                 rows: Vec::new(),
                 sessions: Vec::new(),
-                error: service.err().map(|err| err.to_string()),
+                error,
             };
-            panel.refresh(cx);
+            panel.refresh();
             cx.new(|_| panel)
         })
     }
@@ -84,20 +90,18 @@ impl ZrushPanel {
     fn service_for(repo: PathBuf) -> Result<Zrush> {
         let dirs = Dirs::from_env()?;
         let cfg = Config::load(&dirs)?;
-        Zrush::new(
+        Ok(Zrush::new(
             dirs,
             cfg,
             repo,
             agent::available(),
             Box::new(NullHost),
             None,
-        )
-        .map_err(Into::into)
+        )?)
     }
 
-    fn refresh(&mut self, cx: &mut App) {
+    fn refresh(&mut self) {
         let Some(service) = self.service.as_ref() else {
-            cx.notify();
             return;
         };
 
@@ -109,7 +113,6 @@ impl ZrushPanel {
             }
             Err(err) => self.error = Some(err.to_string()),
         }
-        cx.notify();
     }
 
     fn load_rows(service: &Zrush) -> Result<(Vec<Row>, Vec<Session>)> {
