@@ -1,0 +1,46 @@
+name: rebase z-rush
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebase-z-rush
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: z-rush
+          fetch-depth: 0
+
+      - name: Rebase onto Zed upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/zed-industries/zed.git
+          git fetch upstream main
+          git rebase upstream/main
+
+      - name: Check zrush panel
+        run: cargo check -p zrush_panel
+
+      - name: Check Zed integration
+        run: cargo check -p zed
+
+      - name: Keep Cargo.lock reproducible
+        run: |
+          if ! git diff --quiet -- Cargo.lock; then
+            git add Cargo.lock
+            git commit -m "chore(zrush): refresh Cargo.lock"
+          fi
+
+      - name: Push rebased branch
+        run: git push --force-with-lease origin HEAD:z-rush
