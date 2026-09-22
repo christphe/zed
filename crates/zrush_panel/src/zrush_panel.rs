@@ -88,6 +88,8 @@ pub struct ZrushPanel {
     host: ZedHost,
     rows: Vec<Row>,
     sessions: Vec<Session>,
+    collapsed: HashSet<NodeId>,
+    expanded: HashMap<NodeId, usize>,
     error: Option<String>,
 }
 
@@ -138,6 +140,8 @@ impl ZrushPanel {
                 host,
                 rows: Vec::new(),
                 sessions: Vec::new(),
+                collapsed: HashSet::new(),
+                expanded: HashMap::new(),
                 error,
             };
             panel.refresh();
@@ -163,7 +167,7 @@ impl ZrushPanel {
             return;
         };
 
-        match Self::load_rows(service) {
+        match Self::load_rows(service, &self.collapsed, &self.expanded) {
             Ok((rows, sessions)) => {
                 self.rows = rows;
                 self.sessions = sessions;
@@ -173,7 +177,11 @@ impl ZrushPanel {
         }
     }
 
-    fn load_rows(service: &Zrush) -> Result<(Vec<Row>, Vec<Session>)> {
+    fn load_rows(
+        service: &Zrush,
+        collapsed: &HashSet<NodeId>,
+        expanded: &HashMap<NodeId, usize>,
+    ) -> Result<(Vec<Row>, Vec<Session>)> {
         let worktrees = service.worktrees()?;
         let live = service.live_sessions();
         let resumable = service.resumable_sessions(&worktrees, &live, false);
@@ -206,15 +214,13 @@ impl ZrushPanel {
             })
             .collect::<HashMap<_, _>>();
 
-        let collapsed = HashSet::new();
-        let expanded = HashMap::new();
         let rows = tree::build(&TreeInput {
             worktrees: &worktrees,
             assigned: &assigned,
             statuses: &statuses,
             history: &history,
-            collapsed: &collapsed,
-            expanded: &expanded,
+            collapsed,
+            expanded,
             resumable_max: service.config().resumable_max,
             show_all: false,
         });
@@ -271,7 +277,33 @@ impl ZrushPanel {
             .detach();
     }
 
+    fn expand_more(&mut self, row: &Row, cx: &mut Context<Self>) {
+        let step = self
+            .service
+            .as_ref()
+            .map(|service| service.config().more_step)
+            .unwrap_or(20);
+        let current = self
+            .expanded
+            .get(&row.node)
+            .copied()
+            .or_else(|| {
+                self.service
+                    .as_ref()
+                    .map(|service| service.config().resumable_max)
+            })
+            .unwrap_or(5);
+        self.expanded.insert(row.node.clone(), current + step);
+        self.refresh();
+        cx.notify();
+    }
+
     fn activate_row(&mut self, row: &Row, window: &mut Window, cx: &mut Context<Self>) {
+        if row.kind == RowKind::More {
+            self.expand_more(row, cx);
+            return;
+        }
+
         let Some(service) = self.service.as_ref() else {
             return;
         };
@@ -341,8 +373,9 @@ impl ZrushPanel {
         row: Row,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let clickable = matches!(row.node, NodeId::Worktree(_))
-            && !matches!(row.kind, RowKind::More | RowKind::Orphan | RowKind::Orphans);
+        let clickable = row.kind == RowKind::More
+            || (matches!(row.node, NodeId::Worktree(_))
+                && !matches!(row.kind, RowKind::Orphan | RowKind::Orphans));
 
         div()
             .id(("zrush-row", index))
