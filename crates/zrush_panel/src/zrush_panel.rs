@@ -8,12 +8,14 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+use task::{RevealStrategy, SpawnInTerminal, TaskId};
+use terminal_view::terminal_panel::TerminalPanel;
 use ui::{Label, ListItem, prelude::*};
 use workspace::{
     Workspace,
     dock::{DockPosition, Panel, PanelEvent},
 };
-use zed_actions::SwitchWorktree;
+use zed_actions::{RevealTarget, SwitchWorktree};
 use zrush_core::{
     agent,
     app::Zrush,
@@ -81,6 +83,7 @@ impl Host for ZedHost {
 pub struct ZrushPanel {
     focus_handle: FocusHandle,
     position: DockPosition,
+    workspace: WeakEntity<Workspace>,
     service: Option<Arc<Zrush>>,
     host: ZedHost,
     rows: Vec<Row>,
@@ -130,6 +133,7 @@ impl ZrushPanel {
             let mut panel = Self {
                 focus_handle: cx.focus_handle(),
                 position: DockPosition::Right,
+                workspace: workspace.clone(),
                 service,
                 host,
                 rows: Vec::new(),
@@ -218,6 +222,55 @@ impl ZrushPanel {
         Ok((rows, sessions))
     }
 
+    fn spawn_agent_terminal(
+        &mut self,
+        cwd: PathBuf,
+        command: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((program, args)) = command.split_first() else {
+            self.error = Some("agent returned an empty command".into());
+            cx.notify();
+            return;
+        };
+
+        let Some(workspace) = self.workspace.upgrade() else {
+            self.error = Some("Zed workspace is no longer available".into());
+            cx.notify();
+            return;
+        };
+
+        let Some(terminal_panel) = workspace.read(cx).panel::<TerminalPanel>(cx) else {
+            self.error = Some("Zed terminal panel is unavailable".into());
+            cx.notify();
+            return;
+        };
+
+        let label = format!("zrush · {}", program);
+        let spawn = SpawnInTerminal {
+            id: TaskId(format!("zrush:{}:{}", cwd.display(), program)),
+            full_label: label.clone(),
+            label: label.clone(),
+            command: Some(program.clone()),
+            args: args.to_vec(),
+            command_label: command.join(" "),
+            cwd: Some(cwd),
+            use_new_terminal: true,
+            allow_concurrent_runs: true,
+            reveal: RevealStrategy::Always,
+            reveal_target: RevealTarget::Dock,
+            show_summary: false,
+            show_command: false,
+            show_rerun: false,
+            ..Default::default()
+        };
+
+        terminal_panel
+            .update(cx, |panel, cx| panel.spawn_task(&spawn, window, cx))
+            .detach();
+    }
+
     fn activate_row(&mut self, row: &Row, window: &mut Window, cx: &mut Context<Self>) {
         let Some(service) = self.service.as_ref() else {
             return;
@@ -231,10 +284,21 @@ impl ZrushPanel {
             self.sessions
                 .iter()
                 .find(|session| session.id == id)
-                .map(|session| (session.agent, session.id.as_str()))
+                .map(|session| (session.agent, session.id.clone()))
         });
+        let binding_ref = binding
+            .as_ref()
+            .map(|(agent, id)| (*agent, id.as_str()));
 
-        if let Err(err) = service.open(path, binding) {
+        if let Err(err) = service.open(path, binding_ref) {
+            self.error = Some(err.to_string());
+            cx.notify();
+            return;
+        }
+
+        if let Some((agent, id)) = binding.as_ref()
+            && let Err(err) = service.run_agent(path, agent, Some(id))
+        {
             self.error = Some(err.to_string());
             cx.notify();
             return;
@@ -265,8 +329,7 @@ impl ZrushPanel {
                     );
                 }
                 HostRequest::RunAgent { cwd, command } => {
-                    // Wired in the host already; terminal execution comes next.
-                    let _ = (cwd, command);
+                    self.spawn_agent_terminal(cwd, command, window, cx);
                 }
             }
         }
