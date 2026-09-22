@@ -15,9 +15,13 @@ doctest = false
 [dependencies]
 anyhow.workspace = true
 gpui.workspace = true
+settings.workspace = true
 task.workspace = true
 terminal_view.workspace = true
 ui.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
-zrush-core = { git = "https://github.com/christphe/zrush", rev = "0540559a9cb74f7bbd5a934ef20f3e14b97643ea" }
+zrush-core = { git = "https://github.com/christphe/zrush", rev = "b31587646cf09f8ffabc470e0e31ee7ccf7814fa" }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
