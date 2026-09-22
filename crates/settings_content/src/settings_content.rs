@@ -273,6 +273,7 @@ pub struct SettingsContent {
     pub outline_panel: Option<OutlinePanelSettingsContent>,
 
     pub project_panel: Option<ProjectPanelSettingsContent>,
+    pub zrush_panel: Option<ZrushPanelSettingsContent>,
 
     /// Configuration for Node-related features
     pub node: Option<NodeBinarySettings>,
@@ -409,7 +410,7 @@ fallible_options::flattened_deserialize!(SettingsContent {
         journal, log, line_indicator_format, language_models, outline_panel, project_panel,
         node, proxy, reduce_motion, server_url, credentials_url, session, telemetry, terminal,
         title_bar, vim_mode, calls, which_key, vim, modeline_lines, feature_flags,
-        instrumentation,
+        instrumentation, zrush_panel,
     },
     defaults: {},
 });

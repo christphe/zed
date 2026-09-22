@@ -865,6 +865,11 @@
   // Whether to resize all the panels in a dock when resizing the dock.
   // Can be a combination of "left", "right" and "bottom".
   "resize_all_panels_in_dock": ["left"],
+  // The zrush panel: worktrees and agent sessions.
+  "zrush_panel": {
+    // Which side of the window the zrush panel is docked to.
+    "dock": "right"
+  },
   "project_panel": {
     // Whether to show the project panel button in the status bar
     "button": true,

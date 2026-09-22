@@ -811,6 +811,15 @@ pub struct ProjectPanelAutoOpenSettings {
 
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
+pub struct ZrushPanelSettingsContent {
+    /// Which side of the window the zrush panel is docked to.
+    ///
+    /// Default: right
+    pub dock: Option<DockSide>,
+}
+
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
 pub struct ProjectPanelSettingsContent {
     /// Whether to show the project panel button in the status bar.
     ///
