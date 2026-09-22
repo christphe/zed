@@ -6,7 +6,7 @@ use gpui::{
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use ui::{Label, ListItem, prelude::*};
 use workspace::{
@@ -18,7 +18,8 @@ use zrush_core::{
     agent,
     app::Zrush,
     config::{Config, Dirs},
-    host::NullHost,
+    error::ZrushError,
+    host::Host,
     model::{
         Session,
         tree::{self, NodeId, Row, RowKind, TreeInput},
@@ -27,10 +28,61 @@ use zrush_core::{
 
 actions!(zrush_panel, [Toggle, Refresh]);
 
+#[derive(Debug)]
+enum HostRequest {
+    OpenWorkspace(PathBuf),
+    RunAgent {
+        cwd: PathBuf,
+        command: Vec<String>,
+    },
+}
+
+#[derive(Clone, Default)]
+struct ZedHost {
+    requests: Arc<Mutex<Vec<HostRequest>>>,
+}
+
+impl ZedHost {
+    fn drain(&self) -> Result<Vec<HostRequest>> {
+        let mut requests = self
+            .requests
+            .lock()
+            .map_err(|_| ZrushError::msg("Zed host request queue is poisoned"))?;
+        Ok(requests.drain(..).collect())
+    }
+}
+
+impl Host for ZedHost {
+    fn open_workspace(&self, path: &std::path::Path) -> zrush_core::error::Result<()> {
+        self.requests
+            .lock()
+            .map_err(|_| ZrushError::msg("Zed host request queue is poisoned"))?
+            .push(HostRequest::OpenWorkspace(path.to_path_buf()));
+        Ok(())
+    }
+
+    fn run_agent(
+        &self,
+        cwd: &std::path::Path,
+        command: &[String],
+    ) -> zrush_core::error::Result<()> {
+        self.requests
+            .lock()
+            .map_err(|_| ZrushError::msg("Zed host request queue is poisoned"))?
+            .push(HostRequest::RunAgent {
+                cwd: cwd.to_path_buf(),
+                command: command.to_vec(),
+            });
+        Ok(())
+    }
+}
+
+
 pub struct ZrushPanel {
     focus_handle: FocusHandle,
     position: DockPosition,
     service: Option<Arc<Zrush>>,
+    host: ZedHost,
     rows: Vec<Row>,
     sessions: Vec<Session>,
     error: Option<String>,
@@ -68,7 +120,8 @@ impl ZrushPanel {
             })?
             .context("Zrush needs a local project root")?;
 
-        let (service, error) = match Self::service_for(repo) {
+        let host = ZedHost::default();
+        let (service, error) = match Self::service_for(repo, host.clone()) {
             Ok(service) => (Some(Arc::new(service)), None),
             Err(error) => (None, Some(error.to_string())),
         };
@@ -78,6 +131,7 @@ impl ZrushPanel {
                 focus_handle: cx.focus_handle(),
                 position: DockPosition::Right,
                 service,
+                host,
                 rows: Vec::new(),
                 sessions: Vec::new(),
                 error,
@@ -87,7 +141,7 @@ impl ZrushPanel {
         })
     }
 
-    fn service_for(repo: PathBuf) -> Result<Zrush> {
+    fn service_for(repo: PathBuf, host: ZedHost) -> Result<Zrush> {
         let dirs = Dirs::from_env()?;
         let cfg = Config::load(&dirs)?;
         Ok(Zrush::new(
@@ -95,7 +149,7 @@ impl ZrushPanel {
             cfg,
             repo,
             agent::available(),
-            Box::new(NullHost),
+            Box::new(host),
             None,
         )?)
     }
@@ -186,18 +240,36 @@ impl ZrushPanel {
             return;
         }
 
-        let display_name = path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        let requests = match self.host.drain() {
+            Ok(requests) => requests,
+            Err(err) => {
+                self.error = Some(err.to_string());
+                cx.notify();
+                return;
+            }
+        };
 
-        window.dispatch_action(
-            Box::new(SwitchWorktree {
-                path: path.clone(),
-                display_name,
-            }),
-            cx,
-        );
+        for request in requests {
+            match request {
+                HostRequest::OpenWorkspace(path) => {
+                    let display_name = path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| path.to_string_lossy().into_owned());
+                    window.dispatch_action(
+                        Box::new(SwitchWorktree {
+                            path,
+                            display_name,
+                        }),
+                        cx,
+                    );
+                }
+                HostRequest::RunAgent { cwd, command } => {
+                    // Wired in the host already; terminal execution comes next.
+                    let _ = (cwd, command);
+                }
+            }
+        }
     }
 
     fn render_row(
