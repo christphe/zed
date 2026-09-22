@@ -18,4 +18,4 @@ gpui.workspace = true
 ui.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
-zrush-core = { git = "https://github.com/christphe/zrush", rev = "f9fec3ce8f3baf305cd6f71630011b1dccce5bc3" }
+zrush-core = { git = "https://github.com/christphe/zrush", rev = "0540559a9cb74f7bbd5a934ef20f3e14b97643ea" }
