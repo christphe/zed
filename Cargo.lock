@@ -23028,6 +23028,7 @@ dependencies = [
  "zed_env_vars",
  "zlog",
  "zlog_settings",
+ "zrush_panel",
  "ztracing",
 ]
 
@@ -23410,6 +23411,35 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zrush-core"
+version = "0.0.1"
+source = "git+https://github.com/christphe/zrush?rev=b31587646cf09f8ffabc470e0e31ee7ccf7814fa#b31587646cf09f8ffabc470e0e31ee7ccf7814fa"
+dependencies = [
+ "dirs",
+ "jiff",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "toml 0.9.8",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "zrush_panel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gpui",
+ "settings",
+ "task",
+ "terminal_view",
+ "ui",
+ "workspace",
+ "zed_actions",
+ "zrush-core",
+]
 
 [[package]]
 name = "zstd"
