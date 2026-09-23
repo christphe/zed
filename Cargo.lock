@@ -23415,7 +23415,7 @@ checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 [[package]]
 name = "zrush-core"
 version = "0.0.1"
-source = "git+https://github.com/christphe/zrush?rev=b31587646cf09f8ffabc470e0e31ee7ccf7814fa#b31587646cf09f8ffabc470e0e31ee7ccf7814fa"
+source = "git+https://github.com/christphe/zrush?rev=e90d16dd5f102d59b936a7b990e0fea0948b0c73#e90d16dd5f102d59b936a7b990e0fea0948b0c73"
 dependencies = [
  "dirs",
  "jiff",

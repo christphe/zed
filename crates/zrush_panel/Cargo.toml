@@ -21,7 +21,7 @@ terminal_view.workspace = true
 ui.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
-zrush-core = { git = "https://github.com/christphe/zrush", rev = "b31587646cf09f8ffabc470e0e31ee7ccf7814fa" }
+zrush-core = { git = "https://github.com/christphe/zrush", rev = "e90d16dd5f102d59b936a7b990e0fea0948b0c73" }
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
